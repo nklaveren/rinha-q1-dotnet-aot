@@ -11,7 +11,9 @@ CREATE INDEX idx_transacoes_ids_cliente_id ON transacoes (cliente_id);
 CREATE UNLOGGED TABLE saldos (
 	id SERIAL PRIMARY KEY,
 	cliente_id INTEGER NOT NULL,
-	valor INTEGER NOT NULL
+	valor INTEGER NOT NULL,
+	limite INTEGER NOT NULL
+    constraint saldos_limite_check check (valor >= -limite)
 );
 CREATE INDEX idx_saldos_ids_cliente_id ON saldos (cliente_id);
 
@@ -28,21 +30,14 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION debitar(c_id INT, debito INT, limite int, descricao VARCHAR(10)) 
+CREATE OR REPLACE FUNCTION debitar(c_id INT, debito INT, , descricao VARCHAR(10)) 
     RETURNS TABLE (saldo int, erro BOOL) LANGUAGE plpgsql AS 
 $$
 DECLARE 
 	saldo int;
 BEGIN
 	PERFORM pg_advisory_xact_lock(c_id);
-	SELECT 
-		valor
-	INTO
-		saldo
-	FROM saldos 
-	WHERE cliente_id = c_id;
-
-	IF saldo - debito >= limite THEN
+	BEGIN
 		INSERT INTO transacoes
 			VALUES(DEFAULT, c_id, debito, 'd', descricao, NOW());
 		
@@ -56,22 +51,23 @@ BEGIN
 				FALSE
 			FROM saldos
 			WHERE cliente_id = c_id;
-	ELSE
-		RETURN QUERY SELECT
+	EXCEPTION WHEN OTHERS THEN 
+	RETURN QUERY
+			SELECT
 				valor,
-				TRUE
+				FALSE
 			FROM saldos
 			WHERE cliente_id = c_id;
-	END IF;
+	END;
 END;
 $$;
 
 DO $$ BEGIN 
-	INSERT INTO saldos (cliente_id,valor) 
-	VALUES (1,0),
-		   (2,0),
-		   (3,0),
-		   (4,0),
-		   (5,0);
+	INSERT INTO saldos (cliente_id,valor, limite) 
+	VALUES (1, 0, 1000 * 100 ),
+		   (2, 0, 800 * 100),
+		   (3, 0, 10000  * 100),
+		   (4, 0, 100000 * 100),
+		   (5, 0, 5000 * 100 );
 END;
 $$;

@@ -29,7 +29,6 @@ app.MapPost("/clientes/{id}/transacoes", async (int id, Transacao request, Npgsq
     using var command = new NpgsqlCommand(script, connection);
     command.Parameters.AddWithValue("id", id);
     command.Parameters.AddWithValue("valor", request.Valor);
-    command.Parameters.AddWithValue("limite", -limite);
     command.Parameters.AddWithValue("descricao", request.Descricao);
 
     if (connection.State == ConnectionState.Closed)
